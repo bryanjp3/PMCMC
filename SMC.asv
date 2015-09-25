@@ -1,0 +1,143 @@
+
+clc
+clear all
+format compact
+close all
+
+% rng default
+% rng(15367)
+
+omega = .04;% higher, higher kurt
+theta = 5.14; % lower, higher kurt
+eta = .16;% higher, higher kurt
+rho = -.70;
+dt = 1/250;
+
+numSteps = 2e2;
+w1 = randn(numSteps, 1);
+w2 = randn(numSteps, 1);
+
+x = zeros(numSteps, 1);
+
+x(1) = .021;
+for i = 2:numSteps
+    
+    noise(i) = eta*rho*w1(i)*sqrt(x(i-1)*dt)+  eta*sqrt((1-rho^2)*x(i-1)*dt)*w2(i);
+    x(i) = x(i-1) + (omega-theta*x(i-1))*dt + noise(i);
+    if x(i) < 0 
+        x(i) = .01;
+    end
+end
+
+y = (0) + w1.*sqrt(x*dt);
+rhos = -.8:.01:.1;
+% rhos = .2:.0051:.45; %eta
+% rhos = .01:.01:.2;%omega
+% rhos = .51:.3:5;
+for i = 1:length(rhos)
+    p = [omega, rhos(i), eta, rhos(i)];    
+    numParticles = 1e3;    
+    py=  pf(y, p, numParticles, dt);
+    zz(i) = py;
+    i/length(rhos)*100
+end
+zz = exp(zz-max(zz));
+scatter(rhos, zz)
+
+fit = polyfit(rhos, zz, 2);
+y1 = polyval(fit, rhos);
+
+plot(rhos ,zz,'o')
+hold on
+plot(rhos, y1)
+mean(abs(y1-zz))
+[c, index]=max(y1)
+fittedMax = rhos(index)
+
+[c, index]=max(zz)
+MLE = rhos(index)
+break
+
+
+numParticles = 1000;    
+pd = makedist('Uniform', 'lower', .01, 'upper', .15);
+x0 = random(pd, numParticles, 1);
+x_n = x0;
+
+state = zeros(1, numSteps);
+wm1 = ones(numParticles, 1);
+particles = zeros(numParticles, numSteps);
+
+
+for i = 2:numSteps
+    
+    %propagate  x
+    x_np1 = x_n +                                                                                                                     (omega-theta*x_n)*dt +...
+        eta*rho*(y(i) - (0 - x_n)*dt)+...
+        randn(numParticles,1).*eta.*sqrt(x_n*(1-rho^2)*dt);
+    x_np1(x_np1<0) = 0.01;
+    
+    % compute p(y|x)
+    w = wm1.*normpdf( y(i), (0 - x_np1)*dt, sqrt(x_np1*dt));
+    py(i) = sum(w)/numParticles/100;
+    w = w/sum(w);
+    
+    Neff = 1/sum(w.*w);
+    
+    index = 1:numParticles;
+    if Neff < numParticles*.1;        
+        index = resampleSystematic(w);        
+        x_np1 = x_np1(index);
+        w = w*0+1/numParticles;
+    end
+    
+    
+    zz(i) = Neff;
+    state(i) = sum(x_np1.*w);
+    x_n = x_np1(index);
+    
+    wm1 = w;
+    particles(:, i) = x_n;
+    
+    
+end
+state = state';
+
+hist(w)
+scatter(x_n, w)
+
+plot([x, state])
+
+RMSE = mean(abs(diff(x-state)))
+
+py = py(2:end);
+% log(py)
+output = sum(log(py))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
